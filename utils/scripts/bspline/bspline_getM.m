@@ -23,7 +23,10 @@ funct_path = '../../functions/bspline_utils';
 addpath(funct_path);
 
 order = 5;
+% Via Single Function
 M = zeros(order,order);
+% Via Integrated Function
+M0 = zeros(order,order);
 
 for i = 1:numel(M)
     % notation is different for matlab
@@ -33,8 +36,11 @@ for i = 1:numel(M)
         modv = mod(i,order);
     end
     idx = [ceil(i/order), modv];
-    M(ceil(i/order), modv) = getM(idx,order);
+    M(ceil(i/order), modv) = getSingleM(idx,order);
     fprintf("m(%d,%d) = %f\n",ceil(i/order),modv,M(ceil(i/order), modv));
 end
 
+M0 = getM(order);
+
 M
+M0
