@@ -2,7 +2,7 @@ clc
 clear all
 close all
 
-funct_path = '../functions/bspline_utils';
+funct_path = '../../functions/bspline_matlab_default';
 addpath(funct_path);
 
 % Illustrates B-spline curve estimation without knowing parameter values.
