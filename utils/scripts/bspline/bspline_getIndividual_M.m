@@ -20,8 +20,8 @@ clear all
 close all
 
 order = 3;
-k = order;
-element = [1,3];
+k = order+1;
+element = [3,4];
 % because of matlab's notation we have step the element index down by 1
 i = element(1) - 1; j = element(2) - 1;
 C = @(i,n) factorial(n)/(factorial(i) * factorial(n-i));
@@ -29,6 +29,6 @@ fac = 0;
 for s=j:(k-1)
     fac = fac + ((-1)^(s-j) * C(s-j,k) * (k-s-1)^(k-1-i));
 end
-m = (1/factorial(k - 1)) * C(k-1-i,k-1) * fac;
+m = (1/factorial(k-1)) * C(k-1-i,k-1) * fac;
 
 fprintf("(Without matlab index) m(%d,%d) = %f\n",i,j,m);

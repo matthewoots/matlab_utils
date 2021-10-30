@@ -16,7 +16,7 @@ function m = getSingleM(index, order)
     %   sum(s=j to k-1) {pow(-1,s-j) * C(s-j,k) * pow(k-s-1,k-1-i)} 
     % C(i,n) = factorial(n)/(factorial(i) * factorial(n-i));
 
-    k = order;
+    k = order+1;
     % because of matlab's notation we have step the element index down by 1
     i = index(1) - 1; j = index(2) - 1;
     C = @(i,n) factorial(n)/(factorial(i) * factorial(n-i));
