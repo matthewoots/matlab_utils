@@ -28,7 +28,7 @@ clear all
 funct_path = '../../functions/bspline_utils';
 addpath(funct_path);
 
-order = 4;
+order = 5;
 k = order + 1;
 
 M = getM(order);
@@ -41,13 +41,12 @@ p = zeros(k,1);
 % basics is m = n + p + 1
 % Open B-splines are [knot(p), knot(m-p)]
 % * Clamping only happens for the knots not for the control points!
-% * Control points are not really attached to time
 
 %% User inputs
-timespan = [10,25];
+timespan = [0,25];
 r = rand(1,35);
 numrange = 12; % range for evaluation
-P = numrange * r; % multiply the random [0-1] by the number range
+P = numrange * r; % mutltiple the random [0-1] by the number range
 n = numel(r) - 1;
 
 % How much to segment a knotspan (internal evaluation in a spline segment)
@@ -64,6 +63,8 @@ t = linspace(timespan(1), timespan(2), numel(P)); % knots
 % t = linspace(timespan(1), timespan(2), knots_total); % knots
 dt = (timespan(2) - timespan(1)) / (numel(P)-1); % span of 1 knot
 kn_seg = 15; % Division of 1 span or 1 segment
+EqA = zeros(1,numel(range));
+EqJ = zeros(1,numel(range));
 
 for l = 1:numel(range)
     idx = range(l) - order;
@@ -72,8 +73,7 @@ for l = 1:numel(range)
     lvel = zeros(1,kn_seg-1);
     lacc = zeros(1,kn_seg-1);
     
-    span = linspace(idx, nxt_idx, kn_seg); % relative to the start time as 0 regardless of the time 
-    actualspan = linspace(t(l), t(l+1), kn_seg); % time in abs (simulation time / given time)
+    span = linspace(idx, nxt_idx, kn_seg);
     
     if idx < 0
         error('idx is below suggested idx for control points');
@@ -92,7 +92,7 @@ for l = 1:numel(range)
         u_t = (time - idx)/((idx+1) - idx); % using index is the same as using time since u_t is a factor
         % Save the time constant (0 to 1) and the actual time of the point
         timeConst(m) = u_t;
-        timeActual(m) = actualspan(m);
+        timeActual(m) = span(m) * dt;
 
         % p have several conventions according to SO many papers but i
         % would use the convention under (1) and it is the correct one
@@ -121,6 +121,37 @@ for l = 1:numel(range)
         lvel(m) = inv_dt * du * M * p;
         lacc(m) = inv_dt^2 * ddu * M * p;
         ljrk(m) = inv_dt^3 * dddu * M * p;
+        
+        % Cost function
+        % For cost (integral over squared time derivative) in close form
+        % Depends on the [limit of order] and also whether you want minimize
+        % [Acceleration, Jerk, Snap]
+
+        % Depends on what is used to minimize, we can use Jerk or
+        % Acceleration
+        % [1] For acceleration
+        ddu0 = zeros(1,k); ddu1 = zeros(1,k);
+        for n = 1:k
+            if n >= 3
+                ddu0(n) = (n-1) * (n-2) * 0^(n-3);
+                ddu1(n) = (n-1) * (n-2) * 1^(n-3);
+            end
+        end
+        Qa = inv_dt^3 * ((ddu0' * ddu0) + (ddu1' * ddu1));
+        
+        % [2] For Jerk
+        dddu0 = zeros(1,k); dddu1 = zeros(1,k);
+        for n = 1:k
+            if n >= 4
+                dddu0(n) = (n-1) * (n-2) * (n-3) * 0^(n-4);
+                dddu1(n) = (n-1) * (n-2) * (n-3) * 1^(n-4);
+            end
+        end
+        Qj = inv_dt^4 * ((dddu0' * dddu0) + (dddu1' * dddu1));
+        
+        % For 1 Segment
+        EqA(l) = EqA(l) + p'* M' * Qa * M * p;
+        EqJ(l) = EqJ(l) + p'* M' * Qj * M * p;
     end
     
     % Add the segment to the plot array
@@ -143,74 +174,16 @@ end
 
 fprintf("Time Elapsed %f\n",toc);
 
-tic
-[p0,v0,a0,t0] = getBSpline(order, timespan, P, kn_seg, false);
-fprintf("Time Elapsed %f\n",toc);
-
 %% Plot 
 % For plotting purposes
 
 figure
-subplot(4,1,1)
-hold on
-for i = 1:numel(range)
-    % t(i) should be empty and the control point matching with the time
-    % should be +1, that is why t(i+1)
-    plot(t(i+1),P(range(i)),'o');
-end
-plot(tt,pos,'x')
-title("Position")
-hold off
+subplot(2,1,1)
+plot(1:numel(range),EqA)
+title("Plot of B-Spline Cost [Acceleration]")
 grid on
 
-subplot(4,1,2)
-hold on
-plot(tt,vel,'x')
-title("Velocity")
-hold off
+subplot(2,1,2)
+plot(1:numel(range),EqJ)
+title("Plot of B-Spline Cost [Jerk]")
 grid on
-
-subplot(4,1,3)
-hold on
-plot(tt,acc,'x')
-title("Acceleration")
-hold off
-grid on
-
-subplot(4,1,4)
-hold on
-plot(tt,jrk,'x')
-title("Jerk")
-hold off
-grid on
-
-figure
-subplot(3,1,1)
-hold on
-for i = 1:numel(range)
-    % t(i) should be empty and the control point matching with the time
-    % should be +1, that is why t(i+1)
-    plot(t(i+1),P(range(i)),'o');
-end
-plot(tt,p0,'x')
-title("Position")
-hold off
-grid on
-
-subplot(3,1,2)
-hold on
-plot(tt,v0,'x')
-title("Velocity")
-hold off
-grid on
-
-subplot(3,1,3)
-hold on
-plot(tt,a0,'x')
-title("Acceleration")
-hold off
-grid on
-
-% For cost (integral over squared time derivative) in close form
-% Depends on the [limit of order] and also whether you want minimize
-% [Acceleration, Jerk, Snap]
