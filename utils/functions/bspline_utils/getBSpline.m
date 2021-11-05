@@ -45,18 +45,20 @@ function [pos, vel, acc, tt] = getBSpline(order, timespan, ctrlpt, knotdiv, iscl
     buffer = zeros(1,order + 1);
     knots_total = n + order + 1 + 1;
     % Range of index to evaluate according
-    range = [order:numel(P)-order]; 
+    range = [order:numel(P)]; 
 
 
     %% Main code
     % I may have made the code abit different by not using knots = m + 1 which
     % means using numel(P) rather than knots_total to segment the time horizon
-    t = linspace(timespan(1), timespan(2), numel(P)); % knots
-    % t = linspace(timespan(1), timespan(2), knots_total); % knots
-    dt = (timespan(2) - timespan(1)) / (numel(P)-1); % span of 1 knot
+    % Solution for matching time span
+    dt = (timespan(2) - timespan(1)) / (numel(range)-1); % span of 1 knot
+    t = linspace(timespan(1), timespan(2), (numel(range))); % knots
+    % End of solution for matching time span
+    
     kn_seg = knotdiv; % Division of 1 span or 1 segment
 
-    for l = 1:numel(range)
+    for l = 1:numel(range)-1
         idx = range(l) - order;
         nxt_idx = idx + 1; 
         lpos = zeros(1,kn_seg-1);
@@ -91,17 +93,17 @@ function [pos, vel, acc, tt] = getBSpline(order, timespan, ctrlpt, knotdiv, iscl
             % (1) p = [P(idx-5) P(idx-4) P(idx-3) P(idx-2) P(idx-1) P(idx)]';
 
             % Make the u, du, ddu and p matrix
-            for n = 1:k
-                u(n) = u_t^(n-1);
-                p(n) = P(idx + (n-1) + 1); % we add a +1 here for matlab notation
-                if n >= 2
-                    du(n) = (n-1) * u_t^(n-2);
+            for j = 1:k
+                u(j) = u_t^(j-1);
+                p(j) = P(idx + (j-1) + 1); % we add a +1 here for matlab notation
+                if j >= 2
+                    du(j) = (j-1) * u_t^(j-2);
                 end
-                if n >= 3
-                    ddu(n) = (n-1) * (n-2) * u_t^(n-3);
+                if j >= 3
+                    ddu(j) = (j-1) * (j-2) * u_t^(j-3);
                 end
-                if n >= 4
-                    dddu(n) = (n-1) * (n-2) * (n-3) * u_t^(n-4);
+                if j >= 4
+                    dddu(j) = (j-1) * (j-2) * (j-3) * u_t^(j-4);
                 end
             end
 
