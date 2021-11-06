@@ -7,9 +7,6 @@
 %% Bugs
 % - Now the trajectory does not fully ultilize all the control points,
 % hence not reaching the final destination
-% *** CANNOT use https://pages.mtu.edu/~shene/COURSES/cs3621/NOTES/
-% convention for Deboor algorithm - since knots are seperated and determine
-% the curve but we must use control points to define clamping
 
 %% Bspline Segment
 
@@ -38,8 +35,8 @@ clc
 close all
 clear all
 
-funct_path = '../../functions/bspline_utils';
-addpath(funct_path);
+funct_path = '../../functions';
+addpath(strcat(funct_path,'/bspline'));
 
 order = 4;
 k = order + 1;
@@ -70,19 +67,28 @@ n = numel(r) - 1; % n = controlpoints - 1
 buffer = zeros(1,order + 1);
 knots_total = n + order + 1 + 1;
 % Range of index to evaluate according
-range = [order:numel(P)]; 
+range = [order:numel(P)-order]; 
 % range = [order:knots_total-order]; 
-% Not <---order---><----Accepted Range numel(P)-----><----order+1---->
-% But <---order---><----------Accepted Range numel(P)---------------->
+% <---order---><----Accepted Range numel(P)-----><----order+1---->
 
 
 %% Main code
 
+dt = (timespan(2) - timespan(1)) / (numel(P)-1); % span of 1 knot
+
 % I may have made the code abit different by not using knots = m + 1 which
 % means using numel(P) rather than knots_total to segment the time horizon
+t = linspace(timespan(1), timespan(2), numel(P)); % knots
+% t = linspace(timespan(1), timespan(2), knots_total); % knots
+
 % Solution for matching time span
-dt = (timespan(2) - timespan(1)) / (numel(range)-1); % span of 1 knot
-t = linspace(timespan(1), timespan(2), (numel(range))); % knots
+dtcheck = (timespan(2) - timespan(1)) / (numel(range)-1); % span of 1 knot
+tcheck = linspace(timespan(1), timespan(2), (numel(range))); % knots
+for i = 1:(2*order-1)
+    tcheck = [tcheck (tcheck(end)+dtcheck)];
+end
+dt = dtcheck;
+t = tcheck;
 % End of solution for matching time span
 
 kn_seg = 15; % Division of 1 span or 1 segment

@@ -9,13 +9,11 @@ close all
 %% Add Libraries and Paths
 
 funct_path = '../../functions';
-common_path = '../../functions/common';
-bspline_path = '../../functions/bspline_utils';
-opt_path = '../../functions/optimizer';
-addpath(funct_path);
-addpath(common_path);
-addpath(bspline_path);
-addpath(opt_path);
+
+addpath(strcat(funct_path,'/trajectory'));
+addpath(strcat(funct_path,'/common'));
+addpath(strcat(funct_path,'/bspline'));
+addpath(strcat(funct_path,'/optimizer'));
 
 %% Choose Trajectory profile and method
 % method = "bvp";
