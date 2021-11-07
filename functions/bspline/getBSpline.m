@@ -56,6 +56,8 @@ function [pos, vel, acc, tt] = getBSpline(order, timespan, ctrlpt, knotdiv, iscl
     t = linspace(timespan(1), timespan(2), (numel(range))); % knots
     % End of solution for matching time span
     
+    pos = []; vel = []; acc = []; jrk = []; tt = []; 
+    
     kn_seg = knotdiv; % Division of 1 span or 1 segment
 
     for l = 1:numel(range)-1
@@ -117,21 +119,12 @@ function [pos, vel, acc, tt] = getBSpline(order, timespan, ctrlpt, knotdiv, iscl
         end
 
         % Add the segment to the plot array
-        if l-1>0
-            pos = [pos lpos];
-            vel = [vel lvel];
-            acc = [acc lacc];
-            jrk = [jrk ljrk];
-            tt = [tt timeActual];
-            % tc = [tc timeConst];
-        else
-            pos = lpos;
-            vel = lvel;
-            acc = lacc;
-            jrk = ljrk;
-            tt = timeActual;
-            % tc = timeConst;
-        end
+        pos = [pos lpos];
+        vel = [vel lvel];
+        acc = [acc lacc];
+        jrk = [jrk ljrk];
+        tt = [tt timeActual];
+        % tc = [tc timeConst];
     end
     
 end

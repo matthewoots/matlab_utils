@@ -3,30 +3,25 @@ clear all
 close all
 
 %% Intro and Format
-% x format = (time, x, y, z)
-
 
 %% Add Libraries and Paths
 
 funct_path = '../../functions';
-
 addpath(strcat(funct_path,'/trajectory'));
 addpath(strcat(funct_path,'/common'));
 addpath(strcat(funct_path,'/bspline'));
 addpath(strcat(funct_path,'/optimizer'));
 
+param_path = '../../params';
+addpath(param_path);
+
+class_path = '../../class';
+addpath(class_path);
+
 %% Choose Trajectory profile and method
 % method = "bvp";
-method = "bspline";
-size_cp = 3;
-% waypointinput = "single";
-waypointinput = "multi-random";
-
-%% Set Global Variables
-% Shared Variables for UAVs 
-global nquad; % how many drones participating
-global ctrlpts; % control points for each uav being circulated
-global p; % pos of each uav that is being circulated 
+method = "bspline-multi-random";
+% method = "bspline-single";
 
 %% Setup [Time]
 tt = 15; % total time
@@ -50,6 +45,7 @@ clearance = 0.4; % uav clearance check
 %% Setup other variables
 stop = false;
 order = 4;
+size_cp = 3;
 
 %% Setup [Start/End/intermediate waypoints]
 % Change this to what you need
@@ -69,9 +65,9 @@ for n = 1:nquad
               c(2 )- (p0(2) - c(2)); ...
               c(3) - (p0(3) - c(3))]; % To get the opposite point from start
     
-    %% Single waypoint 
+    
     if method == "bvp"
-
+        %% Single waypoint bvp
         % Set [start end] pose
         p_range = [p0 pf];
 
@@ -86,61 +82,41 @@ for n = 1:nquad
         for j = 1:axes
             x{n}(j+1,:) = s1(j,:); % fit the trajectory inside
             v_offset = [x{n}(j+1,1) x{n}(j+1,1:end-1)];
-            
-            if j > 1
-                x{n}(j+1+3,:) = (x{n}(j+1,:)-v_offset)/dt;
-            end
+            x{n}(j+1+3,:) = (x{n}(j+1,:)-v_offset)/dt;
         end
         
-    %% Multiple waypoints bspline
-    elseif method == "bspline"
+    elseif method == "bspline-multi-random"
+        %% Multi waypoints bspline
         t_abs = linspace(0,tt,int);
         ts = [0 tt];
         
         % Random 3 axes points according to cp size
-        if waypointinput == "multi-random"
-            for q = 1:size_cp
-                for j = 1:axes
-                    cp_tmp(j,q) = (rand(1)*2-1)*xy_range + c(j);
-                    
-                end
-            end
+        for q = 1:size_cp
             for j = 1:axes
-                clampstart = []; clampend = [];
-                for i = 1:order
-                    clampstart = [clampstart p0(j)];
-                    clampend = [clampend pf(j)];
-                end
-                cp(j,:) = [clampstart cp_tmp(j,:) clampend];
-            end
-        % Single 3 axes points according to cp size
-        elseif waypointinput == "single"
-            
-            for j = 1:axes
-                clampstart = []; clampend = [];
-                for i = 1:order
-                    clampstart = [clampstart p0(j)];
-                    clampend = [clampend pf(j)];
-                end
-                cp(j,:) = [clampstart linspace(p0(j), pf(j), size_cp) clampend];
+                cp_tmp(j,q) = (rand(1)*2-1)*xy_range + c(j);  
             end
         end
-        
-        %  size_cp = int / intv + (2*order-1);
-        range = [order:length(cp)]; 
-        dtcheck = (ts(2) - ts(1)) / (numel(range)-1); % span of 1 knot
-        intv = ceil(dtcheck/dt); % try matching with dt set at the beginning
+        for j = 1:axes
+            cp(j,:) = getClampedCP(cp_tmp(j,:),order);
+            range = [order:length(cp)]; 
+            dtcheck = (ts(2) - ts(1)) / (numel(range)-1); % span of 1 knot
+            intv = ceil(dtcheck/dt); % try matching with dt set at the beginning
+            [x{n}(j+1,:), x{n}(j+4,:), x{n}(j+7,:), x{n}(1,:)] = getBSpline(order, ts, cp(j,:), intv, false);
+        end
+    
+    elseif method == "bspline-single"    
+        %% Single waypoints bspline
+        t_abs = linspace(0,tt,int);
+        ts = [0 tt];
         
         for j = 1:axes
-            [p_0, v_0, a_0, t_0] = getBSpline(order, ts, cp(j,:), intv, false);
-            x{n}(1,:) = t_0;
-            x{n}(j+1,:) = p_0;
-            x{n}(j+4,:) = v_0;
-            x{n}(j+7,:) = a_0;
+            cp(j,:) = getClampedCP(linspace(p0(j), pf(j), size_cp),order);
+            range = [order:length(cp)]; 
+            dtcheck = (ts(2) - ts(1)) / (numel(range)-1); % span of 1 knot
+            intv = ceil(dtcheck/dt); % try matching with dt set at the beginning
+            [x{n}(j+1,:), x{n}(j+4,:), x{n}(j+7,:), x{n}(1,:)] = getBSpline(order, ts, cp(j,:), intv, false);
         end
-        
     end
-    
 end
 
 %% Initialise Figure
@@ -174,7 +150,7 @@ for iter = 1:int
     for i = 1:nquad
         % Collision check with respective uavs
         for m = setdiff(1:nquad, i)
-            dv = x{i}(1:3,iter) - x{m}(1:3,iter); % get the distance vector
+            dv = x{i}(2:4,iter) - x{m}(2:4,iter); % get the distance vector
             a = 1.0; b = 1.0; inv_a2 = 1 / a / a; inv_b2 = 1 / b / b; 
             e_d = sqrt(dv(3)^2 * inv_a2 + (dv(1)^2 + dv(2)^2) * inv_b2); % get the ellipsoidal distance 
             d_e = clearance - e_d; % get the distance error

@@ -86,6 +86,7 @@ t = linspace(timespan(1), timespan(2), (numel(range))); % knots
 % End of solution for matching time span
 
 kn_seg = 15; % Division of 1 span or 1 segment
+pos = []; vel = []; acc = []; jrk = []; tt = []; 
 
 for l = 1:numel(range)-1
     idx = range(l) - order;
@@ -146,21 +147,12 @@ for l = 1:numel(range)-1
     end
     
     % Add the segment to the plot array
-    if l-1>0
-        pos = [pos lpos];
-        vel = [vel lvel];
-        acc = [acc lacc];
-        jrk = [jrk ljrk];
-        tt = [tt timeActual];
-        % tc = [tc timeConst];
-    else
-        pos = lpos;
-        vel = lvel;
-        acc = lacc;
-        jrk = ljrk;
-        tt = timeActual;
-        % tc = timeConst;
-    end
+    pos = [pos lpos];
+    vel = [vel lvel];
+    acc = [acc lacc];
+    jrk = [jrk ljrk];
+    tt = [tt timeActual];
+    % tc = [tc timeConst];
 end
 
 fprintf("Time Elapsed %f\n",toc);
