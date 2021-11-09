@@ -18,6 +18,7 @@ classdef quadcopter < handle
         
         path            % path in [time position velocity] format
         c               % clearance zone for the quadcopter
+        cp              % control points for current path
         
         g               % gravity
         m               % mass
@@ -37,7 +38,13 @@ classdef quadcopter < handle
     end
     
     methods
-        function q = quadcopter(nquad, id, param, state, dt, isIdeal)
+        function q = quadcopter(nquad, id, param, state, dt, isIdeal, cp)
+            if (nargin==7)
+                q.cp = cp;
+            else
+                q.cp = [];
+            end
+            
             q.nquad = nquad;
             q.id = id;
             q.s = state;
@@ -74,7 +81,7 @@ classdef quadcopter < handle
             self.t = iter * self.int;
             iter_arr = find(self.path(1,:) >= self.t);
             i = iter_arr(1);
-            self.d_s(1:6) = self.path(2:7,i);
+            self.d_s(1:6) = self.path(2:7,i);            
           
             if self.isIdeal
                 state = zeros(13,1);
@@ -84,7 +91,7 @@ classdef quadcopter < handle
                 self.s_h = [self.s_h state_n_t];
                 
             else
-                mm = 5;
+                mm = 5; % Because ODE requires a range of t
                 tl = linspace(self.t, self.t + self.int, mm);
                 [t_tmp, s_tmp] = ode45(@(t,s) self.quadcopterEOM(t,s), tl, self.s);
                 self.s = s_tmp(mm-1,:)';
@@ -105,8 +112,8 @@ classdef quadcopter < handle
             q_r = self.s(7:10);
             omega = self.s(11:13);
             
-            rot = QuatToRot(q_r');
-            [phi, theta, yaw] = RotToRPY_ZXY(rot);
+            rot = self.QuatToRot(q_r');
+            [phi, theta, yaw] = self.RotToRPY_ZXY(rot);
             euler = [phi; theta; yaw];
             
             acc_des = self.Kd .* ( ...
@@ -160,7 +167,7 @@ classdef quadcopter < handle
             r = s(13);
 
             quat = [qW; qX; qY; qZ];
-            bRw = QuatToRot(quat);
+            bRw = self.QuatToRot(quat);
             wRb = bRw';
 
             % Acceleration
@@ -260,6 +267,17 @@ classdef quadcopter < handle
             grid on
             title(sprintf('Velocity UAV %d', idx));
         end
+        
+        function plotTotalVelHistory(self, idx)
+            subplot(self.nquad,1,idx)
+            vel = abs(self.s_h(5,:)) + ...
+                abs(self.s_h(6,:)) + ...
+                abs(self.s_h(7,:));
+            plot(self.s_h(1,:),vel);
+            xlabel('t [s]'); ylabel('Vel [m/s]');
+            grid on
+            title(sprintf('Total Vel UAV %d', idx));
+        end
     end
     
     methods(Access = private)    
@@ -267,7 +285,7 @@ classdef quadcopter < handle
             invI = inv(I);
         end
         
-        function R = QuatToRot(q)
+        function R = QuatToRot(self, q)
             % QuatToRot Converts a Quaternion to Rotation matrix
             % by Daniel Mellinger
             
@@ -283,7 +301,7 @@ classdef quadcopter < handle
             R = eye(3) + 2 * qahat * qahat + 2 * q(1) * qahat;
         end
         
-        function [phi,theta,psi] = RotToRPY_ZXY(R)
+        function [phi,theta,psi] = RotToRPY_ZXY(self, R)
             %RotToRPY_ZXY Extract Roll, Pitch, Yaw from a world-to-body Rotation Matrix
             %   The rotation matrix in this function is world to body [bRw] you will
             %   need to transpose the matrix if you have a body to world [wRb] such
