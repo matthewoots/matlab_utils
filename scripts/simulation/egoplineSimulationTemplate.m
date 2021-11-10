@@ -224,6 +224,19 @@ for iter = 1:int
         break;
     end
     
+    %% Do bspline replanning
+    for n = 1:nquad
+        Q(n).updatePath(iter);
+        Q(n).updateControlPoint(iter);
+        for m = setdiff(1:nquad, n)
+            cpc0 = Q(n).getControlPointEval();
+            cpc1 = Q(m).getControlPointEval();
+            
+            s0 = Q(n).getState();
+            s1 = Q(m).getState();
+        end
+    end
+    
     %% State updates
     clf % Clear figure
     %  plot3(xbnd,ybnd,zbnd,'.','MarkerSize',1); % Displays the bounding sphere
