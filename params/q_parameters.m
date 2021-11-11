@@ -11,7 +11,7 @@ function params = q_parameters()
     params.kdm = ones(3,1)*300;
     params.arm_length = 0.08; % arm length in m
     params.maxangle = 30*pi/180; % you can specify the maximum commanded angle here
-    params.clearance = 0.4; % uav clearance check
+    params.clearance = 0.6; % uav clearance check
     params.maxF     = 2.5*params.m*params.g;   % left these untouched from the nano plus
     params.minF     = 0.05*params.m*params.g;  % left these untouched from the nano plus
 end

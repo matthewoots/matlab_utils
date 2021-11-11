@@ -15,10 +15,12 @@ classdef quadcopter < handle
         int             % interval that the quadcopter is running on
         t               % current time
         isIdeal         % bool for whether the quadcopter uses dynamic states or ideal states from path
+        order
         
         path            % path in [time position velocity] format
+        path0           % original path in [time position velocity] format
         c               % clearance zone for the quadcopter
-        cp              % control points for current path
+        cp              % current cp without time and includes clamped cp
         ccp             % current cp that the uav is using
         cp0             % control points at the start
         wp              % waypoints
@@ -94,17 +96,19 @@ classdef quadcopter < handle
         
         function setPath(self, path)
             self.path = path;
+            self.path0 = path;
         end
         
         function setControlPoint(self, cp, t, time_horizon, order)
-            self.cp = cp;
             self.cp0 = cp;
             self.cpt(1,:) = t;
+            self.order = order;
             self.cpt(2:4,:) = cp(:,order:end);
             current = 0;
             i = find(self.cpt(1,:) <= current + time_horizon);
             self.ccp = self.cpt(:,i);
             self.ph = time_horizon;
+            self.cp = self.cp0;
         end
         
         function setOtherDebugParam(self,seg,seg_total,dtcheck,dt,intv)
@@ -121,18 +125,68 @@ classdef quadcopter < handle
             % segment that the uav is in
             time = (iter-1) * self.int;
             iter_arr = find(self.path(1,:) >= time);
-            self_tmp = self.path(1:7,iter_arr); 
+            % Truncate the path
+            self_tmp = self.path(1:7,iter_arr);
             self.path = [];
             self.path = self_tmp;
         end
         
+        % [updateControlPoint] :Update control points so as to sort out data for the replanning
+        % module
         function updateControlPoint(self, iter)
-            time = (iter-1) * self.int;
+            % Use time to get sort out the data
+            % Get start and end according to planning horizon
+            time = (iter) * self.int;
             iter_arr_start = find(self.cpt(1,:) >= time);
             iter_arr_end = find(self.cpt(1,:) <= time + self.ph);
+            % Do a check here for the size of the array
+            if width(iter_arr_start(1):iter_arr_end(end)) ~= width(self.ccp)
+                fprintf("[updateControlPoint] input %d output %d mismatch\n", ...
+                    width(iter_arr_start(1):iter_arr_end(end)), width(self.ccp));
+            end
+            
+            % Get the current cp from cpt (full control points with time)
             self_tmp = self.cpt(1:4,iter_arr_start(1):iter_arr_end(end)); 
             self.ccp = [];
             self.ccp = self_tmp;
+        end
+        
+        function replanControlPoint(self, ccp)
+            iter_arr_start = find(self.cpt(1,:) >= ccp(1,1));
+            iter_arr_end = find(self.cpt(1,:) <= ccp(1,end));
+            % Must initiate a check here to force out any inconsistencies
+            % between [ccp size] and the [iter_arr start and end size]
+            if width(iter_arr_start(1):iter_arr_end(end)) ~= width(ccp)
+                fprintf("[replanControlPoint0] input %d output %d mismatch\n", ...
+                    width(iter_arr_start(1):iter_arr_end(end)), width(ccp));
+            end
+            
+            % No saving of variables here, wipe and overwrite
+            self.ccp = [];
+            self.ccp = ccp;
+            self.cpt(:,iter_arr_start(1):iter_arr_end(end)) = ccp;
+            
+            if width(self.cp0) ~= width(self.cp)
+                fprintf("[replanControlPoint1.1] input %d output %d mismatch\n", ...
+                    width(self.cp0), width(self.cp));
+            end
+                
+            % [Error] function here sometimes give extra size for cp
+            % Change cp to plan ahead
+            self.cp(:,iter_arr_start(1)+self.order-1:iter_arr_end(end)+self.order-1) = ...
+                self.cpt(2:4,iter_arr_start(1):iter_arr_end(end));
+            
+            if width(self.cp0) ~= width(self.cp)
+                fprintf("[replanControlPoint1.2] input %d output %d mismatch\n", ...
+                    width(self.cp0), width(self.cp));
+            end
+            
+        end
+        
+        function replanPath(self, path, ts)
+            iter_arr_start = find(self.path(1,:) >= ts(1));
+            iter_arr_end = find(self.path(1,:) <= ts(2));
+            self.path(:,iter_arr_start(1):iter_arr_end(end)) = path;
         end
             
         function updateState(self, iter)
@@ -149,6 +203,7 @@ classdef quadcopter < handle
                 self.s_h = [self.s_h state_n_t];
                 
             else
+                % We give a arbitary range here > 2
                 mm = 5; % Because ODE requires a range of t
                 tl = linspace(self.t, self.t + self.int, mm);
                 [t_tmp, s_tmp] = ode45(@(t,s) self.quadcopterEOM(t,s), tl, self.s);
@@ -224,10 +279,17 @@ classdef quadcopter < handle
                 'h','MarkerSize',4); % Waypoint pose
         end
         
-        function plotControlPoint(self)
-            plot3(self.cp(1,:), ...
-                self.cp(2,:), ...
-                self.cp(3,:), ...
+        function plotControlPoint0(self)
+            plot3(self.cp0(1,:), ...
+                self.cp0(2,:), ...
+                self.cp0(3,:), ...
+                '+','MarkerSize',2); % Control points
+        end
+        
+        function plotControlPoint1(self)
+            plot3(self.cpt(2,:), ...
+                self.cpt(3,:), ...
+                self.cpt(4,:), ...
                 '+','MarkerSize',3); % Control points
         end
         

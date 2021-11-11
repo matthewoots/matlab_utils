@@ -76,6 +76,16 @@ size_wp = 2;
 knot_factor = 4; % Changes the dist estimation for 1 knot 
 knot_span = dt * knot_factor; % Changes the dist estimation for 1 knot
 
+%% Optimizer
+options = struct('GradObj', 'on', ...
+    'Display', 'off', ...
+    'LargeScale','off', ...
+    'HessUpdate','bfgs', ...
+    'InitialHessType','identity', ...
+    'GoalsExactAchieve',1, ...
+    'GradConstr',false);
+% 'Display', 'iter', ...
+
 %% Setup [Start/End/intermediate waypoints]
 % Change this to what you need
 % Most important is [output] here is x(1:4,:) which is (t, xpos, ypos, zpos)
@@ -243,6 +253,62 @@ for iter = 1:int
         break;
     end
     
+    %% Do bspline replanning
+    if (iter*dt - last_replan) > replan_dt
+        if replan
+        for n = 1:nquad
+            Q(n).updateControlPoint(iter);
+            %% Objective function
+            for m = setdiff(1:nquad, n)
+                ccp0 = Q(n).getControlPointEval();
+                ccp1 = Q(m).getControlPointEval();
+
+                s0 = Q(n).getState();
+                s1 = Q(m).getState();
+            end
+            % 1. Error in array less than 3 when doing optimization
+            % Do not know the reason for it but don't change it
+            if (width(Q(n).ccp) > 3)
+                [ccp_tmp,fval2,exitflag,output] = fminlbfgs(@CostFunction, ...
+                        Q(n).ccp(2:4,:), ...
+                        options);
+            else
+                fprintf("[Opt error] Optimization size too small\n");
+            end
+            
+            if width(ccp_tmp) ~= width(Q(n).ccp(2:4,:))
+                fprintf("[Opt error] input %d output %d mismatch\n", width(ccp_tmp), width(Q(n).ccp(2:4,:)));
+            end
+            
+            % 2. Error in array size not being the same even if input has a
+            % fixed array size           
+            if (width(Q(n).ccp) == width(ccp_tmp))
+                % We can start update the current cp with the opt cp
+                ccp1 = [Q(n).ccp(1,:); ccp_tmp];
+                Q(n).replanControlPoint(ccp1);
+                % Replan path and re-insert
+                % - Remember to take the last [order] number of control points before
+                % the current point (current - order)
+                % - Evaluate with cp time that is in the planning horizon 
+                % as ts [ts(1) ts(2)]
+                ts1 = [ccp1(1,1) ccp1(1,end)];
+                x1 = [];
+                for j = 1:axes
+                    fprintf("[cp size] %d|%d\n", width(Q(n).cp(j,:)), width(Q(n).cp0(j,:)));
+                    [x1(j+1,:), x1(j+4,:), accel, x1(1,:)] = getBSpline( ...
+                        order, ts, Q(n).cp(j,:), Q(n).intv(j), false);
+                end             
+                
+                Q(n).replanPath(x1, ts);
+            else
+                fprintf("[Opt error] Input/output array size being different\n");
+            end
+
+            
+        end
+        end
+    last_replan = iter*dt;
+    end
     
     %% State updates
     clf % Clear figure
