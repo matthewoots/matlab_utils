@@ -39,6 +39,7 @@ addpath(class_path);
 tt = 15; % total time
 dt = 0.1; % time interval / based on control output hz
 int = tt/dt; % units
+ts = [0 tt]; % time span
 
 %% Setup [Boundary]
 axes = 3; % How many axis are we using
@@ -49,18 +50,28 @@ r = [xy_range; xy_range; z_range]; % Radius of boundary sphere
 zlim = 0.1; % Z limit cannot be more than 1
 [xbnd, ybnd, zbnd] = sphere(r,c,10); % can plot this as this is the sphere
 
-%% Setup [UAV]
+%% Setup [UAV] 
+% Cannot change if loading from file
 nquad = 3; % number of quad
 param = q_parameters();
 isIdeal = true;
-planning_horizon = 5;
+planning_horizon = 10;
 
 %% Setup other variables
 stop = false;
 xy_rand_pos = 3;
+loadfile = true;
+savefile = false;
+filedir = 'sample/';
+file = 'complex';
+file = strcat(filedir,file,'.mat');
+% [Error] 0.5 value for replan_dt will trigger
+% width(iter_arr_start(1):iter_arr_end(end)) ~= width(self.ccp) error
+replan_dt = 0.5;
+replan = true;
 
 %% BSpline settings
-order = 4;
+order = 6;
 size_wp = 2;
 knot_factor = 4; % Changes the dist estimation for 1 knot 
 knot_span = dt * knot_factor; % Changes the dist estimation for 1 knot
@@ -74,124 +85,131 @@ knot_span = dt * knot_factor; % Changes the dist estimation for 1 knot
 % ss = start state (p, v, a)
 % es = end state (p, v, a)
 % We can choose the trajectory representation or method
-x = [];
-
-% Generating waypoints is not reliant on other uav in syncing up the
-% timestamps and uniting the cp segments
-for n = 1:nquad
-    %% Multi waypoints bspline
-    % Keep this the same because this generates a random point
-    p0 = (randspherepoint(r,c,zlim))';
-    % Set the end point via pf
-    pf = [c(1) - (p0(1) - c(1)); ...
-              c(2 )- (p0(2) - c(2)); ...
-              c(3) - (p0(3) - c(3))]; % To get the opposite point from start
-    % Random 3 axes points according to cp size
-    cp_tmp = [];
-    cp = [];
+if loadfile
+    load(file);
+else
     x = [];
-    seg = [];
-    tic
-    for j = 1:axes
-        % Setup waypoints 
-        for q = 1:size_wp
-            % Generate intermediate waypoints 
-            wp_t0(j,q) = (rand(1)*2-1)*xy_rand_pos + c(j);
-        end
-        % Generate array of waypoints 
-        wp(j,:) = [p0(j) wp_t0(j,:) pf(j)];
-    end
-    
-    % Size of wp segments
-    wp_count = numel(wp(j,:)) - 1;
-    
-    % Get seperation between waypoints
-    for q = 1:wp_count
-        % get 3d vector difference
-        vec_diff = wp(:,q+1) - wp(:,q);
-        % get 3d vector distance 
-        dist_vec_diff = sqrt(vec_diff(1)^2 + vec_diff(2)^2 + vec_diff(3)^2);
-        % upload it into segments to be used
-        wp_sep(q) = dist_vec_diff;
-    end
-    
-    seg_total = 0;
-
-    % Estimated velocity is total time needed to complete
-    % all the wp seperation over total time given
-    est_vel = sum(wp_sep)/tt;
-
-    % Estimation of distance to velocity
-    dist = est_vel * knot_span; 
-    % Check to see which axis has the biggest segment count
-    for q = 1:wp_count
-        % ceil helps to push values above 0 to 1 or more
-        % or else seg count is 0 and causes an error
-        seg(q) = ceil(wp_sep(q)/dist);
-        % total number of segments will be according to the distance
-        seg_total = seg_total + ceil(wp_sep(q)/dist);
-    end
-    
-    for j = 1:axes
-        % Get the total count for the segments for that axis
-        t_seg = sum(seg(:));
-        cp_t = [];
-        for q = 1:wp_count
-            % Why x axis would determine the rest of the axis segment
-            % length?
-            % It is to unsure the unification of the data, decreasing the x
-            % axis length to make sure that the y and z axis have a higher
-            % number of cp
-            if j == 1
-                split = floor(seg(q) / t_seg * seg_total);
-            else
-                split = ceil(seg(q) / t_seg * seg_total);
+    % Generating waypoints is not reliant on other uav in syncing up the
+    % timestamps and uniting the cp segments
+    for n = 1:nquad
+        %% Multi waypoints bspline
+        % Keep this the same because this generates a random point
+        p0 = (randspherepoint(r,c,zlim))';
+        % Set the end point via pf
+        pf = [c(1) - (p0(1) - c(1)); ...
+                  c(2 )- (p0(2) - c(2)); ...
+                  c(3) - (p0(3) - c(3))]; % To get the opposite point from start
+        % Random 3 axes points according to cp size
+        cp_tmp = [];
+        cp = [];
+        x = [];
+        seg = [];
+        tic
+        for j = 1:axes
+            % Setup waypoints 
+            for q = 1:size_wp
+                % Generate intermediate waypoints 
+                wp_t0(j,q) = (rand(1)*2-1)*xy_rand_pos + c(j);
             end
-            cp0 = linspace(wp(j,q),wp(j,q+1),split);
-            cp_t = [cp_t cp0(1:end-1)];
+            % Generate array of waypoints 
+            wp(j,:) = [p0(j) wp_t0(j,:) pf(j)];
         end
-        % Create uniform size of segments for all axis with the first
-        if j > 1 && numel(cp_tmp(1,:)) ~= numel(cp_t)
-            % Over here we crop the cp of the other axis so that it will 
-            % fit into our baseline
-            cp_tmp(j,:) = cp_t(1:numel(cp_tmp(1,:)));
-        else 
-            % Over here we use x axis segments as the baseline
-            cp_tmp(j,:) = cp_t;
+
+        % Size of wp segments
+        wp_count = numel(wp(j,:)) - 1;
+
+        % Get seperation between waypoints
+        for q = 1:wp_count
+            % get 3d vector difference
+            vec_diff = wp(:,q+1) - wp(:,q);
+            % get 3d vector distance 
+            dist_vec_diff = sqrt(vec_diff(1)^2 + vec_diff(2)^2 + vec_diff(3)^2);
+            % upload it into segments to be used
+            wp_sep(q) = dist_vec_diff;
         end
+
+        seg_total = 0;
+
+        % Estimated velocity is total time needed to complete
+        % all the wp seperation over total time given
+        est_vel = sum(wp_sep)/tt;
+
+        % Estimation of distance to velocity
+        dist = est_vel * knot_span; 
+        % Check to see which axis has the biggest segment count
+        for q = 1:wp_count
+            % ceil helps to push values above 0 to 1 or more
+            % or else seg count is 0 and causes an error
+            seg(q) = ceil(wp_sep(q)/dist);
+            % total number of segments will be according to the distance
+            seg_total = seg_total + ceil(wp_sep(q)/dist);
+        end
+
+        for j = 1:axes
+            % Get the total count for the segments for that axis
+            t_seg = sum(seg(:));
+            cp_t = [];
+            for q = 1:wp_count
+                % Why x axis would determine the rest of the axis segment
+                % length?
+                % It is to unsure the unification of the data, decreasing the x
+                % axis length to make sure that the y and z axis have a higher
+                % number of cp
+                if j == 1
+                    split = floor(seg(q) / t_seg * seg_total);
+                else
+                    split = ceil(seg(q) / t_seg * seg_total);
+                end
+                cp0 = linspace(wp(j,q),wp(j,q+1),split);
+                cp_t = [cp_t cp0(1:end-1)];
+            end
+            % Create uniform size of segments for all axis with the first
+            if j > 1 && numel(cp_tmp(1,:)) ~= numel(cp_t)
+                % Over here we crop the cp of the other axis so that it will 
+                % fit into our baseline
+                cp_tmp(j,:) = cp_t(1:numel(cp_tmp(1,:)));
+            else 
+                % Over here we use x axis segments as the baseline
+                cp_tmp(j,:) = cp_t;
+            end
+        end
+        fprintf("Time elapsed to setup [waypoints & cp] %.4f\n",toc);
+        %% Calculate Control Points
+        
+        for j = 1:axes
+            % We will clamp the bspline by adding to the first and the last cp
+            cp(j,:) = getClampedCP(cp_tmp(j,:),order);
+            range = [order:length(cp)]; 
+            dtcheck = (ts(2) - ts(1)) / (numel(range)-1); % span of 1 knot
+            % try matching with dt set at the beginning
+            intv(j) = ceil(dtcheck/dt); 
+            fprintf("[%d] range %d dtcheck %.4f dt %.4f\n",j,numel(range),dtcheck,dt);
+            if intv(j) == 1
+                error("interval matching is 1\n");
+            end
+            [x(j+1,:), x(j+4,:), accel, x(1,:)] = getBSpline(order, ts, cp(j,:), intv(j), false);
+        end
+
+        t = linspace(ts(1), ts(2), numel(range));
+
+        %% Setup Quadcopter
+        ss = zeros(13,1);
+        ss(1:3) = p0;
+        ss(7:10) = [1;0;0;0];
+        Q(n) = quadcopter(nquad, n, param, ss, dt, isIdeal, wp);
+        Q(n).setOtherDebugParam(seg,seg_total,dtcheck,dt,intv); 
+        Q(n).setPath(x);
+        Q(n).setControlPoint(cp, t, planning_horizon, order)
+        Q(n).setTerminal([p0 pf]);
+
     end
-    fprintf("Time elapsed to setup [waypoints & cp] %.4f\n",toc);
-    
+end
 
-    t_abs = linspace(0,tt,int);
-    ts = [0 tt];
-
-    for j = 1:axes
-        % We will clamp the bspline by adding to the first and the last cp
-        cp(j,:) = getClampedCP(cp_tmp(j,:),order);
-        range = [order:length(cp)]; 
-        dtcheck = (ts(2) - ts(1)) / (numel(range)-1); % span of 1 knot
-        % try matching with dt set at the beginning
-        intv(j) = ceil(dtcheck/dt); 
-        fprintf("[%d] range %d dtcheck %.4f dt %.4f\n",j,numel(range),dtcheck,dt);
-        if intv(j) == 1
-            error("interval matching is 1\n");
-        end
-        [x(j+1,:), x(j+4,:), accel, x(1,:)] = getBSpline(order, ts, cp(j,:), intv(j), false);
-    end
-    
-    t = linspace(ts(1), ts(2), numel(range));
-    
-    %% Setup Quadcopter
-    ss = zeros(13,1);
-    ss(1:3) = p0;
-    ss(7:10) = [1;0;0;0];
-    Q(n) = quadcopter(nquad, n, param, ss, dt, isIdeal, wp);
-    Q(n).setOtherDebugParam(seg,seg_total,dtcheck,dt,intv); 
-    Q(n).setPath(x);
-    Q(n).setControlPoint(cp, t, planning_horizon, order)
-    Q(n).setTerminal([p0 pf]);
-
+%% Save path
+if savefile
+    ds = datestr(now,'mm-dd-yy_HH-MM-SS');
+    strname = strcat(int2str(nquad),"_quad_",ds);
+    save(strname,'Q');
 end
 
 %% Initialise Figure
@@ -200,6 +218,7 @@ fig = figure;
 %% Recursive Loop
 fprintf('Starting UAV Path and Loop...\n');
 time = 0;
+last_replan = 0;
 
 for iter = 1:int
 
@@ -224,6 +243,7 @@ for iter = 1:int
         break;
     end
     
+    
     %% State updates
     clf % Clear figure
     %  plot3(xbnd,ybnd,zbnd,'.','MarkerSize',1); % Displays the bounding sphere
@@ -237,7 +257,8 @@ for iter = 1:int
         % Q(n).plotFuturePath();
         Q(n).plotCurrentPath();
         Q(n).plotWaypoint();
-        Q(n).plotControlPoint();
+        Q(n).plotControlPoint0();
+        Q(n).plotControlPoint1();
     end
 
     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]')

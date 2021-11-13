@@ -52,7 +52,7 @@ zlim = 0.1; % Z limit cannot be more than 1
 
 %% Setup [UAV] 
 % Cannot change if loading from file
-nquad = 3; % number of quad
+nquad = 4; % number of quad
 param = q_parameters();
 isIdeal = true;
 planning_horizon = 10;
@@ -63,7 +63,7 @@ xy_rand_pos = 3;
 loadfile = true;
 savefile = false;
 filedir = 'sample/';
-file = 'complex';
+file = 'multi_collision';
 file = strcat(filedir,file,'.mat');
 % [Error] 0.5 value for replan_dt will trigger
 % width(iter_arr_start(1):iter_arr_end(end)) ~= width(self.ccp) error
@@ -232,11 +232,13 @@ last_replan = 0;
 
 for iter = 1:int
 
-    tic
+    timerStart = tic;
+    
     for n = 1:nquad
         %% Stopping Criteria
         % If the trajectory ended, we should stop the simulation
         if isempty(find(Q(n).path(1,:) >= iter*dt))
+            fprintf('Empty! Q(n).path(1,:)\n'); 
             stop = true;
         end
         % Collision check with respective uavs
@@ -244,7 +246,7 @@ for iter = 1:int
             col = Q(n).getCollisionCheck(Q(m));
             if (col)
                 fprintf('Collision! [%d with %d]\n', n, m); 
-                %  stop = true;
+                stop = true;
             end
         end
     end
@@ -254,18 +256,18 @@ for iter = 1:int
     end
     
     %% Do bspline replanning
+    
     if (iter*dt - last_replan) > replan_dt
         if replan
         for n = 1:nquad
+            tic;
             Q(n).updateControlPoint(iter);
             %% Objective function
-            for m = setdiff(1:nquad, n)
-                ccp0 = Q(n).getControlPointEval();
-                ccp1 = Q(m).getControlPointEval();
-
-                s0 = Q(n).getState();
-                s1 = Q(m).getState();
+            if exist('Q.mat', 'file')
+                delete('Q.mat');
             end
+            save('Q.mat','Q', 'n');
+            
             % 1. Error in array less than 3 when doing optimization
             % Do not know the reason for it but don't change it
             if (width(Q(n).ccp) > 3)
@@ -294,7 +296,7 @@ for iter = 1:int
                 ts1 = [ccp1(1,1) ccp1(1,end)];
                 x1 = [];
                 for j = 1:axes
-                    fprintf("[cp size] %d|%d\n", width(Q(n).cp(j,:)), width(Q(n).cp0(j,:)));
+                    % fprintf("[cp size] %d|%d\n", width(Q(n).cp(j,:)), width(Q(n).cp0(j,:)));
                     [x1(j+1,:), x1(j+4,:), accel, x1(1,:)] = getBSpline( ...
                         order, ts, Q(n).cp(j,:), Q(n).intv(j), false);
                 end             
@@ -303,10 +305,11 @@ for iter = 1:int
             else
                 fprintf("[Opt error] Input/output array size being different\n");
             end
-
+            fprintf('[Opt time %d] elapsed %.6f\n',n, toc);
             
         end
         end
+      
     last_replan = iter*dt;
     end
     
@@ -330,13 +333,14 @@ for iter = 1:int
     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]')
     axis([c(1)-sprd  c(1)+sprd  c(2)-sprd c(1)+sprd c(3)-sprd  c(3)+sprd]);
     grid on
-    title(sprintf('Iteration: %d, time: %4.2f', iter, time));
-    timer = toc;
-    fprintf('Iteration %d, time %.2f\n', iter, timer);    
+    title(sprintf('Iteration: %d, time: %4.2f', iter, time));  
 
     %% Set delay to real time 
-    if timer < dt
-       pause(dt-timer); 
+    timerEnd = toc(timerStart);
+    fprintf('Iteration %d, time %.2f\n', iter, timerEnd);  
+    
+    if timerEnd < dt
+       pause(dt-timerEnd); 
     end
     time = time + dt;
 
