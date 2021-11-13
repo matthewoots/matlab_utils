@@ -4,11 +4,11 @@ Matlab utility library with useful scripts on various trajectory and planning al
 ---
 
 ## In Progress (Quadcopter Swarm)
-Implementing `ZJU EGO-SWARM` **flight deconfliction** and **obstacle avoidance** using unconstrained optimization
+Implementing `ZJU EGO-SWARM` **flight deconfliction** and **obstacle avoidance** using unconstrained optimization (`LBFGS`)
 
 | Optimization | Without Optimization |
 | :----: | :----: |
-|![Bspline](media/OptimizationGain2.jpg)| ![Bspline](media/withoutOptimization.jpg) |
+|![opt](media/OptimizationGain2.jpg)| ![wopt](media/withoutOptimization.jpg) |
 
 Currently, `scripts/simulation/egoSimulationTemplate.m` yields the current updated progress
 
@@ -34,7 +34,9 @@ Currently, `scripts/simulation/egoSimulationTemplate.m` yields the current updat
 
 Use `scripts/simulation/bsplineSimulationTemplate.m` for visualization of bspline path
 
-cc
+| Trajectory | States |
+| :----: | :----: |
+|![Bspline](media/bspline.gif)| ![Bspline](media/bspline.jpg) |
 
 ---
 
