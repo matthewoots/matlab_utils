@@ -36,7 +36,7 @@ addpath(class_path);
 %% Choose Trajectory profile and method
 
 %% Setup [Time]
-tt = 15; % total time
+tt = 20; % total time
 dt = 0.1; % time interval / based on control output hz
 int = tt/dt; % units
 ts = [0 tt]; % time span
@@ -52,7 +52,7 @@ zlim = 0.1; % Z limit cannot be more than 1
 
 %% Setup [UAV] 
 % Cannot change if loading from file
-nquad = 4; % number of quad
+nquad = 5; % number of quad
 param = q_parameters();
 isIdeal = true;
 planning_horizon = 10;
@@ -63,7 +63,7 @@ xy_rand_pos = 3;
 loadfile = true;
 savefile = false;
 filedir = 'sample/';
-file = 'multi_collision';
+file = 'demo5';
 file = strcat(filedir,file,'.mat');
 % [Error] 0.5 value for replan_dt will trigger
 % width(iter_arr_start(1):iter_arr_end(end)) ~= width(self.ccp) error
@@ -85,6 +85,7 @@ options = struct('GradObj', 'on', ...
     'GoalsExactAchieve',1, ...
     'GradConstr',false);
 % 'Display', 'iter', ...
+% 'Display', 'off', ...
 
 %% Setup [Start/End/intermediate waypoints]
 % Change this to what you need
@@ -246,7 +247,7 @@ for iter = 1:int
             col = Q(n).getCollisionCheck(Q(m));
             if (col)
                 fprintf('Collision! [%d with %d]\n', n, m); 
-                stop = true;
+                % stop = true;
             end
         end
     end
@@ -328,6 +329,7 @@ for iter = 1:int
         Q(n).plotWaypoint();
         Q(n).plotControlPoint0();
         Q(n).plotControlPoint1();
+        Q(n).plotCollision();
     end
 
     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]')

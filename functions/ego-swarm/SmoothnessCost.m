@@ -1,4 +1,4 @@
-function [cost,gradient] = SmoothnessCost(cp, gain)
+function [cost,gradient] = SmoothnessCost(cp)
     cost = 0; gradient = zeros(3,width(cp));
     cp_tmp = cp;
     for j = 1:width(cp_tmp)-3    
@@ -6,13 +6,13 @@ function [cost,gradient] = SmoothnessCost(cp, gain)
             3 * cp_tmp(:,j + 2) + ...
             3 * cp_tmp(:,j + 1) - ...
             cp_tmp(:,j);
-        cost = cost + gain * norm(jerk)^2;
+        cost = cost + norm(jerk)^2;
         temp_j = 2.0 * jerk;
 
-        gradient(:,j + 0) = gradient(:,j + 0) + gain * (-temp_j);
-        gradient(:,j + 1) = gradient(:,j + 1) + gain * (3.0 * temp_j);
-        gradient(:,j + 2) = gradient(:,j + 2) + gain * (-3.0 * temp_j);
-        gradient(:,j + 3) = gradient(:,j + 3) + gain * (temp_j);
+        gradient(:,j + 0) = gradient(:,j + 0) + (-temp_j);
+        gradient(:,j + 1) = gradient(:,j + 1) + (3.0 * temp_j);
+        gradient(:,j + 2) = gradient(:,j + 2) + (-3.0 * temp_j);
+        gradient(:,j + 3) = gradient(:,j + 3) + (temp_j);
     end
 end
     

@@ -24,7 +24,9 @@ classdef quadcopter < handle
         ccp             % current cp that the uav is using
         cp0             % control points at the start
         wp              % waypoints
+        wpt             % waypoints with time
         cpt             % control points with time
+        cpt0            % control points with time at t0
         ph              % planning horizon
         
         g               % gravity
@@ -48,6 +50,8 @@ classdef quadcopter < handle
         intv
         seg_total_xyz
         seg_indi_xyz
+        colcount
+        col
         
     end
     
@@ -76,6 +80,8 @@ classdef quadcopter < handle
             q.s_h(2:14) = state;
             q.isIdeal = isIdeal;
             q.wp = wp;
+            q.col = zeros(1,3);
+            q.colcount = 0;
             
             q.m = param.m;
             q.arm_l = param.arm_length;
@@ -104,11 +110,26 @@ classdef quadcopter < handle
             self.cpt(1,:) = t;
             self.order = order;
             self.cpt(2:4,:) = cp(:,order:end);
+            self.cpt0 = self.cpt;
             current = 0;
             i = find(self.cpt(1,:) <= current + time_horizon);
             self.ccp = self.cpt(:,i);
             self.ph = time_horizon;
             self.cp = self.cp0;
+            tmp_t = [];
+            
+            for i = 1:width(self.cpt)
+                for j = 1:width(self.wp)
+                    d = self.cpt(2:4,i) - self.wp(:,j);
+                    tmp = sqrt(d(1)^2 + d(2)^2 + d(3)^2);
+                    if tmp <= 0.01
+                        tmp_t = [tmp_t self.cpt0(1,i)];
+                        break;
+                    end
+                end
+            end
+            self.wpt(1,:) = tmp_t;
+            self.wpt(2:4,:) = self.wp;
         end
         
         function setOtherDebugParam(self,seg,seg_total,dtcheck,dt,intv)
@@ -231,6 +252,8 @@ classdef quadcopter < handle
             d_e = self.c - e_d; 
             if d_e > 0
                 col = true;
+                self.col(self.colcount + 1,1:3) = self.s(1:3)';
+                self.colcount = self.colcount + 1;
             else 
                 col = false;
             end
@@ -319,6 +342,15 @@ classdef quadcopter < handle
             xlabel('t [s]'); ylabel('Vel [m/s]');
             grid on
             title(sprintf('Total Vel UAV %d', idx));
+        end
+        
+        function plotCollision(self)
+            for i = 1:self.colcount
+                plot3(self.col(i,1), ...
+                    self.col(i,2), ...
+                    self.col(i,3), ...
+                    'o','MarkerSize',7); % collision point
+            end
         end
     end
     

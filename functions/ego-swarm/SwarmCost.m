@@ -1,7 +1,7 @@
-function [cost,gradient] = SwarmCost(cp, Q, n, gain)
+function [cost,gradient] = SwarmCost(cp, Q, n)
     cost = 0; gradient = zeros(3,width(cp));    
     
-    a = 2.0; b = 1.0; inv_a2 = 1 / a / a; inv_b2 = 1 / b / b;  clearance = Q(n).c;
+    a = 2.0; b = 2.0; inv_a2 = 1 / a / a; inv_b2 = 1 / b / b;  clearance = Q(n).c;
     
     for m = setdiff(1:Q(n).nquad, n)
         ccp1 = []; % cp of other uav
@@ -35,10 +35,10 @@ function [cost,gradient] = SwarmCost(cp, Q, n, gain)
                 % do nothing
                 gradient(:,l) = gradient(:,l) + [0;0;0];
             else
-                cost = cost + gain * dist_err^2;
+                cost = cost + dist_err^2;
                 %  We need to add the gradient together for each of the
                 %  columns for the different UAVs
-                gradient(:,l) = gradient(:,l) + gain * gcoeff' .* dist_vec;
+                gradient(:,l) = gradient(:,l) + gcoeff' .* dist_vec;
             end
         end
     end
