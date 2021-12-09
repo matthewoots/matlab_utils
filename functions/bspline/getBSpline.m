@@ -52,15 +52,19 @@ function [pos, vel, acc, tt] = getBSpline(order, timespan, ctrlpt, knotdiv, iscl
     % I may have made the code abit different by not using knots = m + 1 which
     % means using numel(P) rather than knots_total to segment the time horizon
     % Solution for matching time span
-    dt = (timespan(2) - timespan(1)) / (numel(range)-1); % span of 1 knot
-    t = linspace(timespan(1), timespan(2), (numel(range))); % knots
+    % dt = (timespan(2) - timespan(1)) / (numel(range)-1); % span of 1 knot
+    % t = linspace(timespan(1), timespan(2), (numel(range))); % knots
+    
+    dt = (timespan(2) - timespan(1)) / (numel(range)-(order+1)); % span of 1 knot
+    t = linspace(timespan(1), timespan(2), (numel(range))-(order)); % knots
     % End of solution for matching time span
     
     pos = []; vel = []; acc = []; jrk = []; tt = []; 
     
     kn_seg = knotdiv; % Division of 1 span or 1 segment
-
-    for l = 1:numel(range)-1
+   
+    % for l = 1:numel(range)-1
+    for l = 1:numel(range)-1-order
         idx = range(l) - order;
         nxt_idx = idx + 1; 
         lpos = zeros(1,kn_seg-1);
@@ -68,8 +72,9 @@ function [pos, vel, acc, tt] = getBSpline(order, timespan, ctrlpt, knotdiv, iscl
         lacc = zeros(1,kn_seg-1);
 
         span = linspace(idx, nxt_idx, kn_seg); % relative to the start time as 0 regardless of the time 
-        actualspan = linspace(t(l), t(l+1), kn_seg); % time in abs (simulation time / given time)
-
+        actualspan = linspace(t(l), t(l+1), kn_seg+1); % time in abs (simulation time / given time)
+        % fprintf("Compare span %f / %f\n",dt/kn_seg, actualspan(2)-actualspan(1));
+        
         if idx < 0
             error('idx is below suggested idx for control points');
         end 

@@ -38,6 +38,7 @@ addpath(class_path);
 %% Setup [Time]
 dt = 0.1; % time interval / based on control output hz
 des_vel = 2; % desired velocity 
+clearance = 1.5;
 
 %% Setup [Boundary]
 axes = 3; % How many axis are we using
@@ -50,7 +51,7 @@ zlim = 0.1; % Z limit cannot be more than 1
 
 %% Setup [UAV] 
 % Cannot change if loading from file
-nquad = 5; % number of quad
+nquad = 1; % number of quad
 param = q_parameters();
 isIdeal = true;
 planning_horizon = 10;
@@ -150,7 +151,7 @@ for n = 1:nquad
         wp_t(q) = seg_total * knot_span;
         fprintf("segment %d time %.4f\n", q, wp_t(q));
     end
-    wp_t = [0 wp_t]
+    wp_t = [0 wp_t];
 
     fprintf("Total segment %.4f\n",seg_total);
 
@@ -164,7 +165,8 @@ for n = 1:nquad
             % It is to unsure the unification of the data, decreasing the x
             % axis length to make sure that the y and z axis have a higher
             % number of cp
-            split = seg(q);
+            % cp sount is always +1 of segment count
+            split = seg(q) + 1;
             cp0 = linspace(wp(j,q),wp(j,q+1),split);
             cp_t = [cp_t cp0(1:end-1)];
         end
@@ -184,109 +186,83 @@ for n = 1:nquad
         if intv(j) == 1
             error("interval matching is 1\n");
         end
-        [x(j+1,:), x(j+4,:), accel, x(1,:)] = getBSpline(order, [wp_t(1) wp_t(end)], cp(j,:), intv(j), false);
+        [x(j+1,:), x(j+4,:), x(j+7,:), x(1,:)] = getBSpline(order, [wp_t(1,1) wp_t(1,end)], cp(j,:), intv(j), false);
     end
 
-    t = linspace(wp_t(1), wp_t(end), numel(range));
+    % t = linspace(wp_t(1), wp_t(end), numel(range));
+    t = linspace(wp_t(1), wp_t(end), numel(range)-order);
 
     %% Setup Quadcopter
-    ss = zeros(13,1);
+    ss = zeros(9,1);
     ss(1:3) = p0;
-    ss(7:10) = [1;0;0;0];
-    Q(n) = quadcopter(nquad, n, param, ss, dt, isIdeal, wp);
+    Q(n) = mav(nquad, n, ss, dt, isIdeal, wp, clearance);
     Q(n).setOtherDebugParam(seg,seg_total,dt,intv); 
     Q(n).setPath(x);
     Q(n).setControlPoint(cp, t, planning_horizon, order, wp_t)
     Q(n).setTerminal([p0 pf]);
 end
 
-maxt = 100;
-for n = 1:nquad
-    % Find the longest time
-    if (Q(n).wpt(1,end) < maxt)
-        maxt = Q(n).wpt(1,end);
-    end
-    skip(n) = false;
-end
-
-int = maxt/dt;
-
-for iter = 1:int
-
-    timerStart = tic;
-    time = iter * dt;
-    
-    for n = 1:nquad
-        %% Stopping Criteria
-        % If the trajectory ended, we should stop the simulation
-        if isempty(find(Q(n).path(1,:) >= iter*dt))
-            fprintf('Empty! Q(n).path(1,:)\n'); 
-            stop = true;
-        end
-        % Collision check with respective uavs
-        for m = setdiff(1:nquad, n)
-            col = Q(n).getCollisionCheck(Q(m));
-            if (col)
-                fprintf('Collision! [%d with %d]\n', n, m); 
-                % stop = true;
-            end
-        end
-    end
-    
-    if stop == true
-        break;
-    end
-    
-    %% State updates
-    clf % Clear figure
-    %  plot3(xbnd,ybnd,zbnd,'.','MarkerSize',1); % Displays the bounding sphere
-    for n = 1:nquad
-        %% Update 
-        Q(n).updateState(iter);
-    end
-    
-    hold on
-    for n = 1:nquad
-        %% Plotting
-        Q(n).plotTerminalPose();
-        Q(n).plotCurrentPose();
-        % Q(n).plotFuturePath();
-        Q(n).plotCurrentPath();
-        Q(n).plotWaypoint();
-        Q(n).plotControlPoint0();
-        Q(n).plotControlPoint1();
-        % Q(n).plotCollision();
-    end
-
-    xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]')
-    axis([c(1)-sprd  c(1)+sprd  c(2)-sprd c(1)+sprd c(3)-sprd  c(3)+sprd]);
-    grid on
-    title(sprintf('Iteration: %d, time: %4.2f', iter, time));  
-
-    %% Set delay to real time 
-    timerEnd = toc(timerStart);
-    fprintf('Iteration %d, time %.2f\n', iter, timerEnd);  
-    
-    if timerEnd < dt
-       pause(dt-timerEnd); 
-    end
-    time = time + dt;
-
-end
-
-fprintf('Completed Simulation\n');
-
-%% State plot
-f2 = figure(2);
-% Left Bottom Width Height
-f2.Position = [100 50 500 500];
-for i = 1:nquad 
-    Q(i).plotStateHistory(i);
-end
-
-f3 = figure(3);
-% Left Bottom Width Height
-f3.Position = [650 50 500 500];
-for i = 1:nquad 
-    Q(i).plotTotalVelHistory(i);
-end
+% for iter = 1:int
+% 
+%     timerStart = tic;
+%     time = iter * dt;
+%     
+%     for n = 1:nquad
+%         %% Stopping Criteria
+%         % If the trajectory ended, we should stop the simulation
+%         if isempty(find(Q(n).path(1,:) >= iter*dt))
+%             fprintf('Empty! Q(n).path(1,:)\n'); 
+%             stop = true;
+%         end
+%         % Collision check with respective uavs
+%         for m = setdiff(1:nquad, n)
+%             col = Q(n).getCollisionCheck(Q(m));
+%             if (col)
+%                 fprintf('Collision! [%d with %d]\n', n, m); 
+%                 % stop = true;
+%             end
+%         end
+%     end
+%     
+%     if stop == true
+%         break;
+%     end
+%     
+%     %% State updates
+%     clf % Clear figure
+%     %  plot3(xbnd,ybnd,zbnd,'.','MarkerSize',1); % Displays the bounding sphere
+%     for n = 1:nquad
+%         %% Update 
+%         Q(n).updateState(iter);
+%     end
+%     
+%     hold on
+%     for n = 1:nquad
+%         %% Plotting
+%         Q(n).plotTerminalPose();
+%         Q(n).plotCurrentPose();
+%         % Q(n).plotFuturePath();
+%         Q(n).plotCurrentPath();
+%         Q(n).plotWaypoint();
+%         Q(n).plotControlPoint0();
+%         Q(n).plotControlPoint1();
+%         Q(n).plotCollision();
+%     end
+% 
+%     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]')
+%     axis([c(1)-sprd  c(1)+sprd  c(2)-sprd c(1)+sprd c(3)-sprd  c(3)+sprd]);
+%     grid on
+%     title(sprintf('Iteration: %d, time: %4.2f', iter, time));  
+% 
+%     %% Set delay to real time 
+%     timerEnd = toc(timerStart);
+%     fprintf('Iteration %d, time %.2f\n', iter, timerEnd);  
+%     
+%     if timerEnd < dt
+%        pause(dt-timerEnd); 
+%     end
+%     time = time + dt;
+% 
+% end
+% 
+% fprintf('Completed Simulation\n');

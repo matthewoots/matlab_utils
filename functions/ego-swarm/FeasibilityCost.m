@@ -1,8 +1,33 @@
-function [outputArg1,outputArg2] = FeasibilityCost(inputArg1,inputArg2)
-%FEASIBILITYCOST Summary of this function goes here
-%   Detailed explanation goes here
-outputArg1 = inputArg1;
-outputArg2 = inputArg2;
+function [cost,gradient] = FeasibilityCost(cp, cpdt, max_acc_)
+    
+    ts_inv2 = 1 / cpdt / cpdt;
+    cost = 0;
+    gradient = zeros(3,width(cp));
+
+    for i = 1:width(cp) - 2
+      ai = (cp(:,i+2) - 2 * cp(:,i+1) + cp(:,i)) * ts_inv2;
+      for j = 1:3
+        if (ai(j) > max_acc_)
+          cost = cost + (ai(j) - max_acc_)^2;
+
+          gradient(j, i + 0) = gradient(j, i + 0) + 2 * (ai(j) - max_acc_) * ts_inv2;
+          gradient(j, i + 1) = gradient(j, i + 1) + (-4 * (ai(j) - max_acc_) * ts_inv2);
+          gradient(j, i + 2) = gradient(j, i + 2) + 2 * (ai(j) - max_acc_) * ts_inv2;
+
+        elseif (ai(j) < -max_acc_)
+          cost = cost + (ai(j) + max_acc_)^2;
+
+          gradient(j, i + 0) = gradient(j, i + 0) + 2 * (ai(j) + max_acc_) * ts_inv2;
+          gradient(j, i + 1) = gradient(j, i + 1) + (-4 * (ai(j) + max_acc_) * ts_inv2);
+          gradient(j, i + 2) = gradient(j, i + 2) + 2 * (ai(j) + max_acc_) * ts_inv2;
+
+        else
+
+        end
+      end
+
+    end
+
 end
 
 %% Feasibility Cost from C++

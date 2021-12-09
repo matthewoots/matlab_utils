@@ -41,7 +41,7 @@ clear all
 funct_path = '../../functions';
 addpath(strcat(funct_path,'/bspline'));
 
-order = 4;
+order = 6;
 k = order + 1;
 
 M = getM(order);
@@ -58,7 +58,7 @@ p = zeros(k,1);
 
 %% User inputs
 timespan = [10,30];
-r = rand(1,35);
+r = rand(1,30);
 for i = 1:order
     r = [0 r 0];
 end
@@ -70,6 +70,7 @@ n = numel(r) - 1; % n = controlpoints - 1
 buffer = zeros(1,order + 1);
 knots_total = n + order + 1 + 1;
 % Range of index to evaluate according
+% Start is on order hence the total range is P - (order-1)
 range = [order:numel(P)]; 
 % range = [order:knots_total-order]; 
 % Not <---order---><----Accepted Range numel(P)-----><----order+1---->
@@ -85,7 +86,7 @@ dt = (timespan(2) - timespan(1)) / (numel(range)-1); % span of 1 knot
 t = linspace(timespan(1), timespan(2), (numel(range))); % knots
 % End of solution for matching time span
 
-kn_seg = 15; % Division of 1 span or 1 segment
+kn_seg = 5; % Division of 1 span or 1 segment
 pos = []; vel = []; acc = []; jrk = []; tt = []; 
 
 for l = 1:numel(range)-1
@@ -96,7 +97,8 @@ for l = 1:numel(range)-1
     lacc = zeros(1,kn_seg-1);
     
     span = linspace(idx, nxt_idx, kn_seg); % relative to the start time as 0 regardless of the time 
-    actualspan = linspace(t(l), t(l+1), kn_seg); % time in abs (simulation time / given time)
+    actualspan = linspace(t(l), t(l+1), kn_seg+1); % time in abs (simulation time / given time)
+    fprintf("Compare span %f / %f\n",dt/kn_seg, actualspan(2)-actualspan(1));
     
     if idx < 0
         error('idx is below suggested idx for control points');

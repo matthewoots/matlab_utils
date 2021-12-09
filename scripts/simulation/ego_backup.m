@@ -51,22 +51,22 @@ zlim = 0.1; % Z limit cannot be more than 1
 %% Setup [UAV] 
 % Cannot change if loading from file
 nquad = 5; % number of quad
-clearance = 2;
+clearance = 1.5;
 isIdeal = true;
-planning_horizon = 15;
+planning_horizon = 10;
 
 %% Setup other variables
 stop = false;
 xy_rand_pos = 3;
-loadfile = true;
-savefile = false;
+loadfile = false;
+savefile = true;
 filedir = 'sample/';
-file = 'demo5_multi';
+file = 'demo0';
 file = strcat(filedir,file,'.mat');
 % [Error] 0.5 value for replan_dt will trigger
 % width(iter_arr_start(1):iter_arr_end(end)) ~= width(self.ccp) error
 replan_dt = 0.5;
-replan = true;
+replan = false;
 
 %% BSpline settings
 order = 6;
@@ -76,12 +76,11 @@ knot_span = dt * knot_factor; % Changes the dist estimation for 1 knot
 
 %% Optimizer
 options = struct('GradObj', 'on', ...
-    'Display', 'iter', ...
+    'Display', 'off', ...
     'LargeScale','off', ...
-    'HessUpdate','lbfgs', ...
+    'HessUpdate','bfgs', ...
     'InitialHessType','identity', ...
     'GoalsExactAchieve',1, ...
-    'TolFun',10^(-4), ...
     'GradConstr',false);
 % 'Display', 'iter', ...
 % 'Display', 'off', ...
@@ -171,8 +170,7 @@ else
                 % It is to unsure the unification of the data, decreasing the x
                 % axis length to make sure that the y and z axis have a higher
                 % number of cp
-                % cp sount is always +1 of segment count
-                split = seg(q) + 1;
+                split = seg(q);
                 cp0 = linspace(wp(j,q),wp(j,q+1),split);
                 cp_t = [cp_t cp0(1:end-1)];
             end
@@ -184,7 +182,7 @@ else
         for j = 1:axes
             % We will clamp the bspline by adding to the first and the last cp
             cp(j,:) = getClampedCP(cp_tmp(j,:),order);
-            range = [order+1:length(cp)+1]; 
+            range = [order:length(cp)]; 
             % dtcheck = (seg_total * knot_span) / (numel(range)-1); % span of 1 knot
             % try matching with dt set at the beginning
             intv(j) = ceil(knot_span/dt); 
@@ -195,8 +193,7 @@ else
             [x(j+1,:), x(j+4,:), x(j+7,:), x(1,:)] = getBSpline(order, [wp_t(1,1) wp_t(1,end)], cp(j,:), intv(j), false);
         end
 
-        % t = linspace(wp_t(1), wp_t(end), numel(range));
-        t = linspace(wp_t(1), wp_t(end), numel(range)-order);
+        t = linspace(wp_t(1), wp_t(end), numel(range));
 
         %% Setup Quadcopter
         ss = zeros(9,1);
@@ -338,7 +335,7 @@ for iter = 1:int
         Q(n).plotWaypoint();
         Q(n).plotControlPoint0();
         Q(n).plotControlPoint1();
-        % Q(n).plotCollision();
+        Q(n).plotCollision();
     end
 
     xlabel('X [m]'); ylabel('Y [m]'); zlabel('Z [m]')

@@ -1,8 +1,12 @@
-function [outputArg1,outputArg2] = TerminalCost(inputArg1,inputArg2)
-%TERMINALCOST Summary of this function goes here
-%   Detailed explanation goes here
-outputArg1 = inputArg1;
-outputArg2 = inputArg2;
+function [cost,gradient] = TerminalCost(cp, ref)
+    cost = 0;
+    gradient = zeros(3,width(cp));
+    for i=1:width(cp)
+        diff = cp(:,i) - ref(:,i);
+        sqdiff = diff.^2;
+        cost = cost + sqrt(sqdiff(1)^2 + sqdiff(2)^2 + sqdiff(3)^2);
+        gradient(:,i) = 2 .* diff;
+    end
 end
 
 %% Terminal Cost from C++

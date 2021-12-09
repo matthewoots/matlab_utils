@@ -1,7 +1,6 @@
-function [cost,gradient] = SwarmCost(cp, Q, n)
+function [cost,gradient] = SwarmCost(cp, Q, n, a, b)
     cost = 0; gradient = zeros(3,width(cp));    
-    
-    a = 2.0; b = 2.0; inv_a2 = 1 / a / a; inv_b2 = 1 / b / b;  clearance = Q(n).c;
+    inv_a2 = 1 / a / a; inv_b2 = 1 / b / b;  clearance = Q(n).c;
     
     for m = setdiff(1:Q(n).nquad, n)
         ccp1 = []; % cp of other uav
